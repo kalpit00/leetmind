@@ -1,0 +1,14 @@
+{
+  "_comment": "Example output of resolve_problem(). Sanitized: no cookies, no tokens.",
+  "found": true,
+  "problem": {
+    "frontendId": "84",
+    "title": "Largest Rectangle in Histogram",
+    "slug": "largest-rectangle-in-histogram",
+    "difficulty": "Hard",
+    "topics": ["Array", "Stack", "Monotonic Stack"],
+    "solved": true,
+    "attempted": true,
+    "lists": ["Monotonic Stack", "Hard Patterns"]
+  }
+}

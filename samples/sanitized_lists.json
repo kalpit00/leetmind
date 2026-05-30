@@ -1,0 +1,8 @@
+{
+  "_comment": "Example output of get_my_lists(). Sanitized.",
+  "lists": [
+    { "slug": "monotonic-stack", "name": "Monotonic Stack", "is_public": false, "problem_count": 12 },
+    { "slug": "hard-patterns", "name": "Hard Patterns", "is_public": false, "problem_count": 30 },
+    { "slug": "graphs-revision", "name": "Graphs Revision", "is_public": false, "problem_count": 18 }
+  ]
+}

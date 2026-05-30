@@ -1,0 +1,40 @@
+{
+  "_comment": "Example outputs of get_my_submissions() and get_submission_details(). Sanitized: the LLM never sees session/csrf cookies.",
+  "get_my_submissions": {
+    "problemSlug": "largest-rectangle-in-histogram",
+    "count": 2,
+    "submissions": [
+      {
+        "id": "123456789",
+        "status": "Accepted",
+        "language": "Java",
+        "timestamp": 1712345678,
+        "hasNotes": true,
+        "hasCode": true
+      },
+      {
+        "id": "123450000",
+        "status": "Time Limit Exceeded",
+        "language": "Java",
+        "timestamp": 1712300000,
+        "hasNotes": false,
+        "hasCode": false
+      }
+    ]
+  },
+  "get_submission_details": {
+    "found": true,
+    "submission": {
+      "id": "123456789",
+      "problemSlug": "largest-rectangle-in-histogram",
+      "problemTitle": "Largest Rectangle in Histogram",
+      "status": "Accepted",
+      "language": "Java",
+      "timestamp": 1712345678,
+      "runtime": "8 ms",
+      "memory": "58.2 MB",
+      "notes": "classic increasing monotonic stack",
+      "code": "class Solution {\n    public int largestRectangleArea(int[] heights) {\n        Deque<Integer> stack = new ArrayDeque<>();\n        // ... monotonic increasing stack ...\n        return maxArea;\n    }\n}"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Never let the assistant read real secrets or local cache
+.env
+.env.local
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+logs/
+cache/
