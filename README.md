@@ -4,8 +4,8 @@ A personalized **LeetCode AI agent** that answers questions about your own profi
 
 Built to explore **tool calling** and **agentic architecture**. The agent decides which tools to call and in what order to answer each question.
 
-<video src="docs/screenshots/demo.mov" controls width="100%">
-  <a href="docs/screenshots/demo.mov">Watch demo: Leetmind answering a question with a visible tool-calling trace</a>
+<video src="https://github.com/kalpit00/leetmind/raw/main/docs/screenshots/demo.mp4" controls width="100%">
+  <a href="https://github.com/kalpit00/leetmind/blob/main/docs/screenshots/demo.mp4">Watch demo: Leetmind answering a question with a visible tool-calling trace</a>
 </video>
 
 ## What makes it agentic
