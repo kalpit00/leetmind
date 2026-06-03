@@ -20,23 +20,44 @@ from .llm import get_embedding_model_name, get_openai_client
 Logger = Callable[[str], None]
 
 FIELD_WEIGHTS = {
-    "patternName": 0.18,
-    "techniques": 0.16,
+    "patternName": 0.20,
+    "techniques": 0.18,
     "coreIdea": 0.12,
     "invariant": 0.08,
-    "title": 0.05,
+    "title": 0.03,
 }
 
 IMPORTANT_TERMS = {
-    "histogram": 0.12,
-    "stack": 0.08,
-    "monotonic": 0.08,
-    "matrix": 0.05,
-    "height": 0.05,
-    "heights": 0.05,
-    "rectangle": 0.05,
-    "row": 0.03,
-    "rows": 0.03,
+    "histogram": 0.18,
+    "stack": 0.12,
+    "monotonic": 0.10,
+    "height": 0.08,
+    "rectangle": 0.08,
+    # Matrix/row are intentionally low-value; they are too generic and caused
+    # plain matrix simulation problems to outrank real histogram-stack patterns.
+    "matrix": 0.01,
+    "row": 0.01,
+}
+
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "become",
+    "becomes",
+    "by",
+    "for",
+    "from",
+    "in",
+    "into",
+    "of",
+    "on",
+    "or",
+    "problem",
+    "the",
+    "to",
+    "with",
 }
 
 
@@ -147,8 +168,24 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+def _normalize_token(token: str) -> str:
+    token = token.lower()
+    # Simple plural normalization is enough for terms like histograms/rows/heights.
+    if len(token) > 4 and token.endswith("s"):
+        token = token[:-1]
+    return token
+
+
 def _tokens(text: str) -> set[str]:
-    return {t for t in re.split(r"[^a-z0-9]+", text.lower()) if t}
+    tokens = []
+    for raw in re.split(r"[^a-z0-9]+", text.lower()):
+        if not raw:
+            continue
+        token = _normalize_token(raw)
+        if token in STOPWORDS:
+            continue
+        tokens.append(token)
+    return set(tokens)
 
 
 def _text(value: Any) -> str:
@@ -188,17 +225,20 @@ def _keyword_boost(query: str, analysis: dict[str, Any]) -> tuple[float, list[st
         signals.append(f"{field}: {', '.join(sorted(overlap)[:4])}")
 
     joined = " ".join(fields.values()).lower()
+    joined_tokens = _tokens(joined)
     for term, weight in IMPORTANT_TERMS.items():
-        if term in q_tokens and term in joined:
+        if term in q_tokens and term in joined_tokens:
             boost += weight
             signals.append(f"important term: {term}")
 
     # Common phrase-level bridges for matrix -> histogram problems.
-    q = query.lower()
-    if ("histogram" in q and "stack" in q) and ("histogram" in joined and "stack" in joined):
+    if {"histogram", "stack"} <= q_tokens and {"histogram", "stack"} <= joined_tokens:
         boost += 0.18
         signals.append("phrase: histogram + stack")
-    if ("matrix" in q and "histogram" in q) and ("matrix" in joined or "height" in joined):
+
+    has_histogram_intent = "histogram" in q_tokens or "height" in q_tokens
+    has_histogram_evidence = "histogram" in joined_tokens or "height" in joined_tokens
+    if "matrix" in q_tokens and has_histogram_intent and has_histogram_evidence:
         boost += 0.12
         signals.append("phrase: matrix -> histogram/heights")
 
