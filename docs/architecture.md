@@ -13,6 +13,8 @@ Local SQLite Cache                       leetmind/db/
         ↓
 Keyword Search Engine (FTS5 + scoring)   leetmind/search/
         ↓
+Knowledge Base (offline LLM analysis)    leetmind/kb/
+        ↓
 Agent Tools (sanitized JSON)             leetmind/tools/
         ↓
 Agent (OpenAI Agents SDK)                leetmind/agent/
@@ -31,9 +33,11 @@ CLI Chat Interface                       leetmind/cli/
 
 ### 2. SQLite cache (`leetmind/db/`)
 - `schema.sql`: `problems`, `lists`, `list_problems`, `submissions`, `sync_meta`,
-  and an FTS5 virtual table `search_docs`.
+  the FTS5 table `search_docs`, and the knowledge-base tables
+  `solution_analyses`, `problem_bridges`, plus the FTS5 table `pattern_docs`.
 - `repositories.py`: thin data-access objects (`ProblemsRepo`, `ListsRepo`,
-  `SubmissionsRepo`, `MetaRepo`). No SQL leaks above this layer.
+  `SubmissionsRepo`, `MetaRepo`, `AnalysesRepo`, `BridgesRepo`). No SQL leaks
+  above this layer.
 
 ### 3. Sync (`leetmind/sync/`)
 - `sync_problems` → full catalog + your solved status.
@@ -58,19 +62,45 @@ CLI Chat Interface                       leetmind/cli/
 | code keyword match | +2 |
 | title fuzzy match | +1 |
 
-### 5. Tools (`leetmind/tools/`)
+### 5. Knowledge Base (`leetmind/kb/`)
+The KB distills accepted submissions into reusable problem-solving memory.
+
+- `analyzer.py`: offline LLM pass run by `leetmind analyze-solutions`. For each
+  accepted submission with code, it extracts:
+  - pattern name
+  - core idea
+  - invariant
+  - complexity
+  - pitfalls
+  - reusable template code
+  - technique labels
+  - observable coding-style traits
+- `pattern_search.py`: rebuilds and queries `pattern_docs`, an FTS5 index over
+  the distilled analyses.
+- `style_profile.py`: aggregates recurring style traits and technique usage.
+- `bridge.py`: connects a target problem to already-solved problems whose
+  pattern/template transfers to it. This powers flows like
+  "Maximal Rectangle -> Largest Rectangle in Histogram".
+
+The KB is persistent but local. It is rebuilt incrementally using `code_hash` and
+`analysis_version`, so unchanged submissions are skipped on repeated analysis.
+
+### 6. Tools (`leetmind/tools/`)
 Plain, framework-free functions returning sanitized dicts:
 `resolve_problem`, `get_my_lists`, `get_problems_in_list`, `get_my_submissions`,
-`get_submission_details`, `search_my_solutions`.
+`get_submission_details`, `search_my_solutions`,
+`get_solution_pattern`, `search_solution_patterns`, `get_coding_style_profile`,
+`bridge_problem_to_my_solutions`.
 
-### 6. Agent (`leetmind/agent/`)
+### 7. Agent (`leetmind/agent/`)
 - `system_prompt.py`: behavior + tool-use guidance.
 - `tool_registry.py`: wraps the tool functions with `function_tool` (schemas are
   derived from type hints + docstrings).
 - `agent.py`: builds the `Agent` and runs it (`ask_once`, `Conversation`).
 
-### 7. CLI (`leetmind/cli/main.py`)
-`sync`, `status`, `ask`, `chat`, `search`.
+### 8. CLI (`leetmind/cli/main.py`)
+`sync`, `status`, `analyze-solutions`, `kb-status`, `ask`, `chat`, `search`,
+`patterns`, `bridge`.
 
 ## Why tools instead of raw data?
 
@@ -87,3 +117,24 @@ The agent learns *what* to ask, not *how* to fetch. A typical multi-step trace:
 
 This is the layered tool-calling behavior the project is built to demonstrate.
 The cache makes repeated calls cheap and deterministic.
+
+## Why the KB matters
+
+The MVP could answer "did I solve X?" and "what submissions do I have?". The KB
+adds "how does X relate to what I already know?".
+
+Example:
+
+1. User: "Help me solve Maximal Rectangle using what I've already solved."
+2. Agent -> `bridge_problem_to_my_solutions("Maximal Rectangle")`.
+3. Bridge tool finds analyzed solved problems with transferable patterns:
+   - `Largest Rectangle in Histogram`
+   - `Maximal Square`
+   - `Count Submatrices With All Ones`
+4. Tool returns relationships, shared patterns, transfer steps, and the user's
+   own reusable template code.
+5. Agent explains the bridge: build a histogram for each matrix row, then reuse
+   the user's monotonic-stack histogram template.
+
+That turns Leetmind from a profile lookup agent into a personal problem-solving
+memory layer.

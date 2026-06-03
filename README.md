@@ -36,6 +36,8 @@ Local SQLite Cache                       leetmind/db/
         ↓
 Keyword Search Engine (FTS5 + scoring)   leetmind/search/
         ↓
+Knowledge Base (patterns + bridges)       leetmind/kb/
+        ↓
 Agent Tools (sanitized JSON only)        leetmind/tools/
         ↓
 Agent (OpenAI Agents SDK)                leetmind/agent/
@@ -43,7 +45,10 @@ Agent (OpenAI Agents SDK)                leetmind/agent/
 CLI Chat Interface                       leetmind/cli/
 ```
 
-**Tools:** `resolve_problem`, `get_my_lists`, `get_problems_in_list`, `get_my_submissions`, `get_submission_details`, `search_my_solutions`
+**Tools:** `resolve_problem`, `get_my_lists`, `get_problems_in_list`,
+`get_my_submissions`, `get_submission_details`, `search_my_solutions`,
+`get_solution_pattern`, `search_solution_patterns`, `get_coding_style_profile`,
+`bridge_problem_to_my_solutions`
 
 Details: [docs/architecture.md](docs/architecture.md)
 
@@ -61,6 +66,7 @@ cp .env.example .env
 # Edit .env: LEETCODE_SESSION, LEETCODE_CSRF, MODEL_API_KEY
 
 uv run leetmind sync --limit 50   # omit --limit for a full sync
+uv run leetmind analyze-solutions # build the pattern/style knowledge base
 uv run leetmind ask "Have I solved Two Sum?"
 uv run leetmind chat
 ```
@@ -85,11 +91,14 @@ leetmind ask "Have I solved Two Sum?"
 
 | Command                 | Description                                                                                               |
 | ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| `leetmind sync`         | Pull problems, lists, and submissions into SQLite. Flags: `--limit N`, `--skip-submissions`, `--no-code`. |
-| `leetmind status`       | Show cache stats and verify the session cookie (no LLM).                                                  |
-| `leetmind ask "..."`    | Ask one question. Tool trace on by default; use `--quiet` to hide.                                        |
-| `leetmind chat`         | Interactive multi-turn chat.                                                                              |
-| `leetmind search "..."` | Run keyword search directly (no LLM).                                                                     |
+| `leetmind sync` | Pull problems, lists, and submissions into SQLite. Flags: `--limit N`, `--skip-submissions`, `--no-code`. |
+| `leetmind analyze-solutions` | Analyze accepted submissions into pattern/style knowledge (uses LLM). |
+| `leetmind kb-status` | Show KB stats, languages, and top techniques. |
+| `leetmind ask "..."` | Ask one question. Tool trace on by default; use `--quiet` to hide. |
+| `leetmind chat` | Interactive multi-turn chat. |
+| `leetmind search "..."` | Run raw keyword search directly (no LLM). |
+| `leetmind patterns "..."` | Search distilled solution patterns (no LLM). |
+| `leetmind bridge "..."` | Connect a problem to your solved patterns/templates (uses LLM). |
 
 ## Demo
 
@@ -129,6 +138,19 @@ The `search_my_solutions` tool uses FTS5 retrieval re-ranked by field-weighted s
 uv run leetmind search "monotonic stack" --limit 3
 ```
 
+### 5. Knowledge base bridge
+
+After `analyze-solutions`, Leetmind can connect a target problem to patterns you
+already solved. For example, Maximal Rectangle bridges to Largest Rectangle in
+Histogram by turning each matrix row into a histogram and reusing the monotonic
+stack template.
+
+```bash
+uv run leetmind bridge "Maximal Rectangle"
+uv run leetmind ask "Help me solve Maximal Rectangle using what I've already solved"
+uv run leetmind ask "What's my coding style?"
+```
+
 ## Project layout
 
 ```
@@ -137,7 +159,8 @@ leetmind/
   db/         SQLite schema, connection, repositories
   sync/       sync_problems, sync_lists, sync_submissions
   search/     FTS5 indexing + custom scoring
-  tools/      six agent tools (sanitized JSON)
+  kb/         solution analysis, pattern search, style profile, bridges
+  tools/      agent tools (sanitized JSON)
   agent/      agent, system prompt, tool registry, trace hooks
   cli/        Typer CLI
 samples/      example sanitized tool outputs

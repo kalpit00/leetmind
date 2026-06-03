@@ -14,6 +14,27 @@ uv run leetmind status            # confirm what got cached
 > problem). Use `--limit N` for a quick demo, or `--skip-submissions` to skip
 > code/submission data entirely.
 
+## Build the knowledge base
+
+After submissions with code are synced, analyze them into persistent pattern
+memory:
+
+```bash
+uv run leetmind analyze-solutions
+uv run leetmind kb-status
+```
+
+Example after a full local sync:
+
+```text
+Knowledge base:
+  analyses       1910
+  indexed        1910
+  cached bridges 3
+  languages      Java(1902), MySQL(4), TypeScript(2), JavaScript(1), Go(1)
+  top techniques array, dynamic programming, greedy, string manipulation, sorting, two pointers, hash table, counting
+```
+
 ## Screenshot script (copy-paste, in order)
 
 Each block maps to a placeholder image in the README. `ask` prints the live
@@ -54,6 +75,8 @@ Yes, you solved Two Sum (Problem #1). Your solution used a HashMap ...
 ```bash
 uv run leetmind ask "Have I solved problem 84?"
 uv run leetmind ask "Which of my solved problems use a monotonic stack?"
+uv run leetmind ask "Help me solve Maximal Rectangle using what I've already solved"
+uv run leetmind ask "What's my coding style?"
 uv run leetmind chat            # interactive, keeps conversation history
 uv run leetmind ask "..." --quiet   # hide the trace, answer only
 ```
@@ -75,6 +98,26 @@ Prints ranked matches with scoring reasons, e.g.:
     "matchedOn": ["solved (accepted)", "list name match", "topic tag match", "notes match", "code keyword match"]
   }
 ]
+```
+
+## Inspecting the knowledge base directly
+
+```bash
+uv run leetmind patterns "monotonic stack"
+uv run leetmind bridge "Maximal Rectangle"
+```
+
+`patterns` searches distilled solution analyses. `bridge` connects a target
+problem to already-solved problems whose pattern/template transfers to it. For
+example, Maximal Rectangle bridges strongly to Largest Rectangle in Histogram:
+
+```text
+relationship: build a histogram for each matrix row, then use the monotonic-stack
+histogram template from Largest Rectangle in Histogram.
+transfer steps:
+  1. Compute heights of consecutive 1s for each row.
+  2. Run largestRectangleArea on each row's histogram.
+  3. Track the maximum rectangle area.
 ```
 
 ## Security note
