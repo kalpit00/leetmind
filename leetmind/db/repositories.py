@@ -238,6 +238,148 @@ class MetaRepo:
         return row["value"] if row else None
 
 
+class AnalysesRepo:
+    """Structured KB analyses of accepted submissions (one row per problem)."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def upsert(self, analysis: dict[str, Any]) -> None:
+        self.conn.execute(
+            """
+            INSERT INTO solution_analyses
+                (problem_slug, submission_id, problem_title, language, pattern_name,
+                 core_idea, invariant, complexity, pitfalls_json, template_code,
+                 style_notes_json, techniques_json, code_hash, analysis_version, analyzed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(problem_slug) DO UPDATE SET
+                submission_id    = excluded.submission_id,
+                problem_title    = excluded.problem_title,
+                language         = excluded.language,
+                pattern_name     = excluded.pattern_name,
+                core_idea        = excluded.core_idea,
+                invariant        = excluded.invariant,
+                complexity       = excluded.complexity,
+                pitfalls_json    = excluded.pitfalls_json,
+                template_code    = excluded.template_code,
+                style_notes_json = excluded.style_notes_json,
+                techniques_json  = excluded.techniques_json,
+                code_hash        = excluded.code_hash,
+                analysis_version = excluded.analysis_version,
+                analyzed_at      = excluded.analyzed_at
+            """,
+            (
+                analysis["problem_slug"],
+                analysis.get("submission_id"),
+                analysis.get("problem_title"),
+                analysis.get("language"),
+                analysis.get("pattern_name"),
+                analysis.get("core_idea"),
+                analysis.get("invariant"),
+                analysis.get("complexity"),
+                json.dumps(analysis.get("pitfalls", [])),
+                analysis.get("template_code"),
+                json.dumps(analysis.get("style_notes", [])),
+                json.dumps(analysis.get("techniques", [])),
+                analysis.get("code_hash"),
+                analysis.get("analysis_version", 1),
+                _now(),
+            ),
+        )
+        self.conn.commit()
+
+    def get(self, problem_slug: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM solution_analyses WHERE problem_slug = ?", (problem_slug,)
+        ).fetchone()
+        return _analysis_from_db(row) if row else None
+
+    def existing_hash(self, problem_slug: str, version: int) -> str | None:
+        """Return the stored code_hash if an analysis at this version exists."""
+        row = self.conn.execute(
+            "SELECT code_hash FROM solution_analyses WHERE problem_slug = ? AND analysis_version = ?",
+            (problem_slug, version),
+        ).fetchone()
+        return row["code_hash"] if row else None
+
+    def all(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT * FROM solution_analyses").fetchall()
+        return [_analysis_from_db(r) for r in rows]
+
+    def count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) AS c FROM solution_analyses").fetchone()["c"]
+
+
+class BridgesRepo:
+    """Cached problem-to-solved-problem bridges."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def replace_for_target(self, target_slug: str, bridges: list[dict[str, Any]]) -> int:
+        self.conn.execute(
+            "DELETE FROM problem_bridges WHERE target_problem_slug = ?", (target_slug,)
+        )
+        for b in bridges:
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO problem_bridges
+                    (source_problem_slug, target_problem_slug, relationship,
+                     shared_patterns_json, transfer_steps_json, confidence, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    b["source_problem_slug"],
+                    target_slug,
+                    b.get("relationship"),
+                    json.dumps(b.get("shared_patterns", [])),
+                    json.dumps(b.get("transfer_steps", [])),
+                    float(b.get("confidence", 0.0)),
+                    _now(),
+                ),
+            )
+        self.conn.commit()
+        return len(bridges)
+
+    def for_target(self, target_slug: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM problem_bridges WHERE target_problem_slug = ? ORDER BY confidence DESC",
+            (target_slug,),
+        ).fetchall()
+        return [_bridge_from_db(r) for r in rows]
+
+
+def _analysis_from_db(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "problem_slug": row["problem_slug"],
+        "submission_id": row["submission_id"],
+        "problem_title": row["problem_title"],
+        "language": row["language"],
+        "pattern_name": row["pattern_name"],
+        "core_idea": row["core_idea"],
+        "invariant": row["invariant"],
+        "complexity": row["complexity"],
+        "pitfalls": json.loads(row["pitfalls_json"] or "[]"),
+        "template_code": row["template_code"],
+        "style_notes": json.loads(row["style_notes_json"] or "[]"),
+        "techniques": json.loads(row["techniques_json"] or "[]"),
+        "code_hash": row["code_hash"],
+        "analysis_version": row["analysis_version"],
+        "analyzed_at": row["analyzed_at"],
+    }
+
+
+def _bridge_from_db(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "source_problem_slug": row["source_problem_slug"],
+        "target_problem_slug": row["target_problem_slug"],
+        "relationship": row["relationship"],
+        "shared_patterns": json.loads(row["shared_patterns_json"] or "[]"),
+        "transfer_steps": json.loads(row["transfer_steps_json"] or "[]"),
+        "confidence": row["confidence"],
+    }
+
+
 def _problem_from_db(row: sqlite3.Row) -> Problem:
     topics = [TopicTag(name=t["name"], slug=t["slug"]) for t in json.loads(row["topics_json"] or "[]")]
     return Problem(

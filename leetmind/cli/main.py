@@ -1,11 +1,15 @@
 """Leetmind command-line interface.
 
 Commands:
-  leetmind sync     pull your LeetCode data into the local SQLite cache
-  leetmind status   show what's cached and whether the cookie works
-  leetmind ask      ask the agent a single question
-  leetmind chat     interactive multi-turn chat with the agent
-  leetmind search   debug: run keyword search directly (no LLM)
+  leetmind sync               pull your LeetCode data into the local SQLite cache
+  leetmind status             show what's cached and whether the cookie works
+  leetmind analyze-solutions  build the knowledge base from your solved code (LLM)
+  leetmind kb-status          show knowledge-base contents
+  leetmind ask                ask the agent a single question
+  leetmind chat               interactive multi-turn chat with the agent
+  leetmind search             debug: run keyword search directly (no LLM)
+  leetmind patterns           debug: search the analyzed pattern KB (no agent)
+  leetmind bridge             debug: bridge a problem to your solved ones (LLM)
 """
 
 from __future__ import annotations
@@ -88,6 +92,55 @@ def status() -> None:
         typer.secho("Cache is empty. Run `leetmind sync` first.", fg=typer.colors.YELLOW)
 
 
+@app.command(name="analyze-solutions")
+def analyze_solutions_cmd(
+    limit: int = typer.Option(0, help="Cap solved problems to analyze (0 = all available)."),
+    force: bool = typer.Option(False, help="Re-analyze even if code is unchanged."),
+) -> None:
+    """Build the knowledge base from your accepted submissions (uses the LLM)."""
+    _require_cache()
+    from ..db.database import get_connection
+    from ..kb.analyzer import analyze_solutions
+    from ..kb.llm import KBConfigError
+
+    conn = get_connection()
+    try:
+        stats = analyze_solutions(conn, limit=limit or None, force=force, log=typer.echo)
+    except KBConfigError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
+    typer.secho(
+        f"Done. analyzed={stats['analyzed']} skipped={stats['skipped']} failed={stats['failed']}",
+        fg=typer.colors.GREEN,
+    )
+
+
+@app.command(name="kb-status")
+def kb_status() -> None:
+    """Show knowledge-base contents (no LLM)."""
+    from ..db.database import get_connection
+    from ..kb.style_profile import build_style_profile
+
+    conn = get_connection()
+    analyses = conn.execute("SELECT COUNT(*) c FROM solution_analyses").fetchone()["c"]
+    patterns = conn.execute("SELECT COUNT(*) c FROM pattern_docs").fetchone()["c"]
+    bridges = conn.execute("SELECT COUNT(*) c FROM problem_bridges").fetchone()["c"]
+    typer.echo("Knowledge base:")
+    typer.echo(f"  analyses       {analyses}")
+    typer.echo(f"  indexed        {patterns}")
+    typer.echo(f"  cached bridges {bridges}")
+    if analyses == 0:
+        typer.secho("KB is empty. Run `leetmind analyze-solutions`.", fg=typer.colors.YELLOW)
+        return
+    profile = build_style_profile(conn)
+    if profile["languages"]:
+        langs = ", ".join(f"{x['language']}({x['count']})" for x in profile["languages"])
+        typer.echo(f"  languages      {langs}")
+    if profile["topTechniques"]:
+        techs = ", ".join(x["technique"] for x in profile["topTechniques"][:8])
+        typer.echo(f"  top techniques {techs}")
+
+
 _TRACE_COLORS = {
     "tool": typer.colors.CYAN,
     "result": typer.colors.BRIGHT_BLACK,
@@ -166,6 +219,34 @@ def search(query: str = typer.Argument(...), limit: int = typer.Option(8)) -> No
         for r in results
     ]
     typer.echo(json.dumps(out, indent=2))
+
+
+@app.command()
+def patterns(query: str = typer.Argument(...), limit: int = typer.Option(8)) -> None:
+    """Debug: search the analyzed pattern knowledge base (no agent/LLM)."""
+    from ..db.database import get_connection
+    from ..kb.pattern_search import search_patterns
+
+    conn = get_connection()
+    results = search_patterns(conn, query, limit=limit)
+    typer.echo(json.dumps(results, indent=2))
+
+
+@app.command()
+def bridge(problem: str = typer.Argument(..., help="Problem number, slug, or title.")) -> None:
+    """Debug: bridge a problem to your solved ones (uses the LLM, no agent loop)."""
+    _require_cache()
+    from ..db.database import get_connection
+    from ..kb.bridge import bridge_problem
+    from ..kb.llm import KBConfigError
+
+    conn = get_connection()
+    try:
+        result = bridge_problem(conn, problem)
+    except KBConfigError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
+    typer.echo(json.dumps(result, indent=2))
 
 
 def _require_cache() -> None:
