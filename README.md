@@ -100,8 +100,8 @@ leetmind ask "Have I solved Two Sum?"
 | `leetmind chat` | Interactive multi-turn chat. |
 | `leetmind search "..."` | Run raw keyword search directly (no LLM). |
 | `leetmind patterns "..."` | Search distilled solution patterns (no LLM). |
-| `leetmind semantic-patterns "..."` | Search distilled patterns by meaning, not exact words. |
-| `leetmind bridge "..."` | Connect a problem to your solved patterns/templates (uses LLM). |
+| `leetmind semantic-patterns "..."` | Search distilled patterns by meaning, with field-aware reranking. |
+| `leetmind bridge "..."` | Connect a problem to your solved patterns/templates (uses LLM). Add `--refresh` to ignore cached bridges. |
 
 ## Demo
 
@@ -149,7 +149,7 @@ Histogram by turning each matrix row into a histogram and reusing the monotonic
 stack template.
 
 ```bash
-uv run leetmind bridge "Maximal Rectangle"
+uv run leetmind bridge "Maximal Rectangle" --refresh
 uv run leetmind semantic-patterns "matrix rows become histograms"
 uv run leetmind ask "Help me solve Maximal Rectangle using what I've already solved"
 uv run leetmind ask "What's my coding style?"

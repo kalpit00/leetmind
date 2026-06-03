@@ -83,9 +83,10 @@ The KB distills accepted submissions into reusable problem-solving memory.
 - `bridge.py`: connects a target problem to already-solved problems whose
   pattern/template transfers to it. This powers flows like
   "Maximal Rectangle -> Largest Rectangle in Histogram".
-- `semantic_search.py`: embeds analyzed patterns into `solution_embeddings` and
-  runs local cosine similarity in Python. This adds meaning-based retrieval
-  without introducing a vector database dependency.
+- `semantic_search.py`: embeds analyzed patterns into `solution_embeddings`,
+  runs local cosine similarity in Python, then applies a small field-aware
+  reranker over pattern names, techniques, core ideas, and invariants. This adds
+  meaning-based retrieval without introducing a vector database dependency.
 
 The KB is persistent but local. It is rebuilt incrementally using `code_hash` and
 `analysis_version`, so unchanged submissions are skipped on repeated analysis.

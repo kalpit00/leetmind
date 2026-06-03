@@ -107,14 +107,16 @@ Prints ranked matches with scoring reasons, e.g.:
 ```bash
 uv run leetmind patterns "monotonic stack"
 uv run leetmind semantic-patterns "matrix rows become histograms"
-uv run leetmind bridge "Maximal Rectangle"
+uv run leetmind bridge "Maximal Rectangle" --refresh
 ```
 
 `patterns` searches distilled solution analyses by keyword. `semantic-patterns`
-searches the same KB by meaning using local embeddings. `bridge` connects a
-target problem to already-solved problems whose pattern/template transfers to it.
-For example, Maximal Rectangle bridges strongly to Largest Rectangle in
-Histogram:
+searches the same KB by meaning using embeddings plus a small field-aware
+reranker over pattern names, techniques, core ideas, and invariants. `bridge`
+connects a target problem to already-solved problems whose pattern/template
+transfers to it. Use `--refresh` when you want to ignore a cached bridge and
+recompute candidates after changing the retrieval layer. For example, Maximal
+Rectangle bridges strongly to Largest Rectangle in Histogram:
 
 ```text
 relationship: build a histogram for each matrix row, then use the monotonic-stack

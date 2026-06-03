@@ -282,7 +282,10 @@ def semantic_patterns(query: str = typer.Argument(...), limit: int = typer.Optio
 
 
 @app.command()
-def bridge(problem: str = typer.Argument(..., help="Problem number, slug, or title.")) -> None:
+def bridge(
+    problem: str = typer.Argument(..., help="Problem number, slug, or title."),
+    refresh: bool = typer.Option(False, help="Ignore cached bridge and recompute."),
+) -> None:
     """Debug: bridge a problem to your solved ones (uses the LLM, no agent loop)."""
     _require_cache()
     from ..db.database import get_connection
@@ -291,7 +294,7 @@ def bridge(problem: str = typer.Argument(..., help="Problem number, slug, or tit
 
     conn = get_connection()
     try:
-        result = bridge_problem(conn, problem)
+        result = bridge_problem(conn, problem, use_cache=not refresh)
     except KBConfigError as exc:
         typer.secho(str(exc), fg=typer.colors.RED)
         raise typer.Exit(1) from exc

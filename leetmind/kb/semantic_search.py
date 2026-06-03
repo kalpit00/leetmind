@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 import sqlite3
 from collections.abc import Callable
 from typing import Any
@@ -17,6 +18,26 @@ from typing import Any
 from .llm import get_embedding_model_name, get_openai_client
 
 Logger = Callable[[str], None]
+
+FIELD_WEIGHTS = {
+    "patternName": 0.18,
+    "techniques": 0.16,
+    "coreIdea": 0.12,
+    "invariant": 0.08,
+    "title": 0.05,
+}
+
+IMPORTANT_TERMS = {
+    "histogram": 0.12,
+    "stack": 0.08,
+    "monotonic": 0.08,
+    "matrix": 0.05,
+    "height": 0.05,
+    "heights": 0.05,
+    "rectangle": 0.05,
+    "row": 0.03,
+    "rows": 0.03,
+}
 
 
 def analysis_embedding_text(analysis: dict[str, Any]) -> str:
@@ -126,10 +147,69 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+def _tokens(text: str) -> set[str]:
+    return {t for t in re.split(r"[^a-z0-9]+", text.lower()) if t}
+
+
+def _text(value: Any) -> str:
+    if isinstance(value, list):
+        return " ".join(str(v) for v in value)
+    return str(value or "")
+
+
+def _keyword_boost(query: str, analysis: dict[str, Any]) -> tuple[float, list[str]]:
+    """Domain-aware boost on top of semantic similarity.
+
+    Embeddings can over-rank generic "matrix" problems. This reranker rewards
+    exact conceptual overlap in the fields that matter most for LeetCode pattern
+    transfer: pattern name, techniques, core idea, and invariant.
+    """
+    q_tokens = _tokens(query)
+    if not q_tokens:
+        return 0.0, []
+
+    boost = 0.0
+    signals: list[str] = []
+    fields = {
+        "title": _text(analysis.get("problem_title")),
+        "patternName": _text(analysis.get("pattern_name")),
+        "techniques": _text(analysis.get("techniques")),
+        "coreIdea": _text(analysis.get("core_idea")),
+        "invariant": _text(analysis.get("invariant")),
+    }
+
+    for field, text in fields.items():
+        overlap = q_tokens & _tokens(text)
+        if not overlap:
+            continue
+        weight = FIELD_WEIGHTS[field]
+        field_boost = min(weight, weight * len(overlap) / 2)
+        boost += field_boost
+        signals.append(f"{field}: {', '.join(sorted(overlap)[:4])}")
+
+    joined = " ".join(fields.values()).lower()
+    for term, weight in IMPORTANT_TERMS.items():
+        if term in q_tokens and term in joined:
+            boost += weight
+            signals.append(f"important term: {term}")
+
+    # Common phrase-level bridges for matrix -> histogram problems.
+    q = query.lower()
+    if ("histogram" in q and "stack" in q) and ("histogram" in joined and "stack" in joined):
+        boost += 0.18
+        signals.append("phrase: histogram + stack")
+    if ("matrix" in q and "histogram" in q) and ("matrix" in joined or "height" in joined):
+        boost += 0.12
+        signals.append("phrase: matrix -> histogram/heights")
+
+    return min(boost, 0.7), signals
+
+
 def semantic_search_by_vector(
     conn: sqlite3.Connection,
     query_vector: list[float],
     *,
+    query: str = "",
     limit: int = 8,
 ) -> list[dict[str, Any]]:
     """Search with a precomputed query vector (useful for tests and bridge)."""
@@ -139,10 +219,12 @@ def semantic_search_by_vector(
     analyses = AnalysesRepo(conn)
     scored = []
     for row in embeddings:
-        score = cosine_similarity(query_vector, row["embedding"])
+        similarity = cosine_similarity(query_vector, row["embedding"])
         analysis = analyses.get(row["problem_slug"])
         if not analysis:
             continue
+        boost, signals = _keyword_boost(query, analysis)
+        final_score = similarity + boost
         scored.append(
             {
                 "problemSlug": analysis["problem_slug"],
@@ -152,10 +234,13 @@ def semantic_search_by_vector(
                 "coreIdea": analysis["core_idea"],
                 "invariant": analysis["invariant"],
                 "techniques": analysis["techniques"],
-                "similarity": score,
+                "similarity": similarity,
+                "keywordBoost": boost,
+                "finalScore": final_score,
+                "matchedSignals": signals,
             }
         )
-    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    scored.sort(key=lambda x: x["finalScore"], reverse=True)
     return scored[:limit]
 
 
@@ -167,5 +252,5 @@ def semantic_search_patterns(
 ) -> list[dict[str, Any]]:
     """Embed a query and search analyzed solution patterns semantically."""
     [query_vector] = embed_text([query])
-    return semantic_search_by_vector(conn, query_vector, limit=limit)
+    return semantic_search_by_vector(conn, query_vector, query=query, limit=limit)
 
