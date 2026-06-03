@@ -28,15 +28,43 @@ FIELD_WEIGHTS = {
 }
 
 IMPORTANT_TERMS = {
+    # Stack / histogram family.
     "histogram": 0.18,
     "stack": 0.12,
     "monotonic": 0.10,
     "height": 0.08,
     "rectangle": 0.08,
+    # Common LeetCode pattern families. These are strong enough to separate
+    # pattern matches (e.g. trie / union-find / heap) from generic array/matrix
+    # overlap, but weaker than the highly diagnostic histogram+stack combo.
+    "window": 0.12,
+    "pointer": 0.10,
+    "prefix": 0.10,
+    "trie": 0.12,
+    "heap": 0.12,
+    "interval": 0.10,
+    "union": 0.12,
+    "find": 0.08,
+    "component": 0.08,
+    "topological": 0.12,
+    "memoization": 0.10,
+    # Useful but broad; keep them modest so they do not swamp better signals.
+    "state": 0.05,
     # Matrix/row are intentionally low-value; they are too generic and caused
     # plain matrix simulation problems to outrank real histogram-stack patterns.
     "matrix": 0.01,
     "row": 0.01,
+}
+
+TOKEN_ALIASES = {
+    "components": "component",
+    "dsu": "union",
+    "memo": "memoization",
+    "memoized": "memoization",
+    "memorization": "memoization",
+    "pointers": "pointer",
+    "topo": "topological",
+    "topsort": "topological",
 }
 
 STOPWORDS = {
@@ -173,11 +201,12 @@ def _normalize_token(token: str) -> str:
     # Simple plural normalization is enough for terms like histograms/rows/heights.
     if len(token) > 4 and token.endswith("s"):
         token = token[:-1]
-    return token
+    return TOKEN_ALIASES.get(token, token)
 
 
 def _tokens(text: str) -> set[str]:
     tokens = []
+    lowered = text.lower()
     for raw in re.split(r"[^a-z0-9]+", text.lower()):
         if not raw:
             continue
@@ -185,6 +214,10 @@ def _tokens(text: str) -> set[str]:
         if token in STOPWORDS:
             continue
         tokens.append(token)
+    # Treat "priority queue" as heap for LeetCode retrieval. Do not alias plain
+    # "queue", since BFS queues are not heaps.
+    if "priority queue" in lowered:
+        tokens.append("heap")
     return set(tokens)
 
 
