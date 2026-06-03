@@ -15,6 +15,8 @@ Keyword Search Engine (FTS5 + scoring)   leetmind/search/
         ↓
 Knowledge Base (offline LLM analysis)    leetmind/kb/
         ↓
+Semantic Retrieval (OpenAI embeddings)   leetmind/kb/semantic_search.py
+        ↓
 Agent Tools (sanitized JSON)             leetmind/tools/
         ↓
 Agent (OpenAI Agents SDK)                leetmind/agent/
@@ -81,16 +83,21 @@ The KB distills accepted submissions into reusable problem-solving memory.
 - `bridge.py`: connects a target problem to already-solved problems whose
   pattern/template transfers to it. This powers flows like
   "Maximal Rectangle -> Largest Rectangle in Histogram".
+- `semantic_search.py`: embeds analyzed patterns into `solution_embeddings` and
+  runs local cosine similarity in Python. This adds meaning-based retrieval
+  without introducing a vector database dependency.
 
 The KB is persistent but local. It is rebuilt incrementally using `code_hash` and
 `analysis_version`, so unchanged submissions are skipped on repeated analysis.
+Embeddings are also incremental: unchanged analysis text is skipped per
+embedding model.
 
 ### 6. Tools (`leetmind/tools/`)
 Plain, framework-free functions returning sanitized dicts:
 `resolve_problem`, `get_my_lists`, `get_problems_in_list`, `get_my_submissions`,
 `get_submission_details`, `search_my_solutions`,
 `get_solution_pattern`, `search_solution_patterns`, `get_coding_style_profile`,
-`bridge_problem_to_my_solutions`.
+`semantic_search_solution_patterns`, `bridge_problem_to_my_solutions`.
 
 ### 7. Agent (`leetmind/agent/`)
 - `system_prompt.py`: behavior + tool-use guidance.
@@ -99,8 +106,8 @@ Plain, framework-free functions returning sanitized dicts:
 - `agent.py`: builds the `Agent` and runs it (`ask_once`, `Conversation`).
 
 ### 8. CLI (`leetmind/cli/main.py`)
-`sync`, `status`, `analyze-solutions`, `kb-status`, `ask`, `chat`, `search`,
-`patterns`, `bridge`.
+`sync`, `status`, `analyze-solutions`, `embed-kb`, `kb-status`, `ask`, `chat`,
+`search`, `patterns`, `semantic-patterns`, `bridge`.
 
 ## Why tools instead of raw data?
 

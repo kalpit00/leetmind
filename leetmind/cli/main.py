@@ -4,11 +4,13 @@ Commands:
   leetmind sync               pull your LeetCode data into the local SQLite cache
   leetmind status             show what's cached and whether the cookie works
   leetmind analyze-solutions  build the knowledge base from your solved code (LLM)
+  leetmind embed-kb            embed analyzed patterns for semantic retrieval
   leetmind kb-status          show knowledge-base contents
   leetmind ask                ask the agent a single question
   leetmind chat               interactive multi-turn chat with the agent
   leetmind search             debug: run keyword search directly (no LLM)
   leetmind patterns           debug: search the analyzed pattern KB (no agent)
+  leetmind semantic-patterns  debug: semantic search the analyzed pattern KB
   leetmind bridge             debug: bridge a problem to your solved ones (LLM)
 """
 
@@ -124,10 +126,12 @@ def kb_status() -> None:
     conn = get_connection()
     analyses = conn.execute("SELECT COUNT(*) c FROM solution_analyses").fetchone()["c"]
     patterns = conn.execute("SELECT COUNT(*) c FROM pattern_docs").fetchone()["c"]
+    embeddings = conn.execute("SELECT COUNT(*) c FROM solution_embeddings").fetchone()["c"]
     bridges = conn.execute("SELECT COUNT(*) c FROM problem_bridges").fetchone()["c"]
     typer.echo("Knowledge base:")
     typer.echo(f"  analyses       {analyses}")
     typer.echo(f"  indexed        {patterns}")
+    typer.echo(f"  embeddings     {embeddings}")
     typer.echo(f"  cached bridges {bridges}")
     if analyses == 0:
         typer.secho("KB is empty. Run `leetmind analyze-solutions`.", fg=typer.colors.YELLOW)
@@ -139,6 +143,35 @@ def kb_status() -> None:
     if profile["topTechniques"]:
         techs = ", ".join(x["technique"] for x in profile["topTechniques"][:8])
         typer.echo(f"  top techniques {techs}")
+
+
+@app.command(name="embed-kb")
+def embed_kb_cmd(
+    limit: int = typer.Option(0, help="Cap analyses to embed (0 = all)."),
+    force: bool = typer.Option(False, help="Re-embed even if content is unchanged."),
+    batch_size: int = typer.Option(64, help="Embedding batch size."),
+) -> None:
+    """Embed analyzed solutions for semantic retrieval (uses embeddings API)."""
+    from ..db.database import get_connection
+    from ..kb.llm import KBConfigError
+    from ..kb.semantic_search import embed_kb
+
+    conn = get_connection()
+    try:
+        stats = embed_kb(
+            conn,
+            limit=limit or None,
+            force=force,
+            batch_size=batch_size,
+            log=typer.echo,
+        )
+    except KBConfigError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
+    typer.secho(
+        f"Done. embedded={stats['embedded']} skipped={stats['skipped']} failed={stats['failed']}",
+        fg=typer.colors.GREEN,
+    )
 
 
 _TRACE_COLORS = {
@@ -229,6 +262,22 @@ def patterns(query: str = typer.Argument(...), limit: int = typer.Option(8)) -> 
 
     conn = get_connection()
     results = search_patterns(conn, query, limit=limit)
+    typer.echo(json.dumps(results, indent=2))
+
+
+@app.command(name="semantic-patterns")
+def semantic_patterns(query: str = typer.Argument(...), limit: int = typer.Option(8)) -> None:
+    """Debug: semantic search the analyzed pattern KB (uses embeddings API)."""
+    from ..db.database import get_connection
+    from ..kb.llm import KBConfigError
+    from ..kb.semantic_search import semantic_search_patterns
+
+    conn = get_connection()
+    try:
+        results = semantic_search_patterns(conn, query, limit=limit)
+    except KBConfigError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
     typer.echo(json.dumps(results, indent=2))
 
 

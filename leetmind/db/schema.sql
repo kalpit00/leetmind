@@ -132,3 +132,18 @@ CREATE VIRTUAL TABLE IF NOT EXISTS pattern_docs USING fts5(
     template_code,
     tokenize = 'porter unicode61'
 );
+
+-- Local semantic index over solution_analyses. We intentionally store vectors
+-- as JSON for now instead of adding a vector DB: with a few thousand analyzed
+-- submissions, Python cosine similarity over SQLite rows is simple and fast
+-- enough for local use.
+CREATE TABLE IF NOT EXISTS solution_embeddings (
+    problem_slug     TEXT PRIMARY KEY,
+    embedding_model  TEXT NOT NULL,
+    embedding_json   TEXT NOT NULL,
+    content_hash     TEXT NOT NULL,
+    embedded_at      INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_solution_embeddings_model
+    ON solution_embeddings(embedding_model);

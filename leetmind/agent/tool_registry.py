@@ -20,6 +20,7 @@ from ..tools.get_submission_details import get_submission_details
 from ..tools.resolve_problem import resolve_problem
 from ..tools.search_my_solutions import search_my_solutions
 from ..tools.search_solution_patterns import search_solution_patterns
+from ..tools.semantic_search_solution_patterns import semantic_search_solution_patterns
 
 TOOLS = [
     # Core profile tools (raw LeetCode cache).
@@ -32,6 +33,7 @@ TOOLS = [
     # Knowledge-base tools (distilled from analyzed submissions).
     function_tool(get_solution_pattern),
     function_tool(search_solution_patterns),
+    function_tool(semantic_search_solution_patterns),
     function_tool(get_coding_style_profile),
     function_tool(bridge_problem_to_my_solutions),
 ]

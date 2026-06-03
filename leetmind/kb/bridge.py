@@ -29,12 +29,25 @@ _SYSTEM_PROMPT = (
 
 
 def _shortlist_candidates(conn: sqlite3.Connection, target: dict[str, Any], k: int) -> list[dict[str, Any]]:
-    """Find analyzed solved problems related to the target by topic/title."""
+    """Find analyzed solved problems related to the target.
+
+    Prefer semantic retrieval if embeddings exist; fall back to keyword pattern
+    search so bridges still work before `leetmind embed-kb` has been run.
+    """
+    from ..db.repositories import EmbeddingsRepo
+    from .semantic_search import semantic_search_patterns
     from .pattern_search import search_patterns
 
     query_terms = list(target.get("topics", [])) + [target.get("title", "")]
     query = " ".join(t for t in query_terms if t)
-    hits = search_patterns(conn, query, limit=k) if query.strip() else []
+    hits = []
+    if query.strip() and EmbeddingsRepo(conn).count() > 0:
+        try:
+            hits = semantic_search_patterns(conn, query, limit=k)
+        except Exception:
+            hits = []
+    if not hits and query.strip():
+        hits = search_patterns(conn, query, limit=k)
 
     from ..db.repositories import AnalysesRepo
 

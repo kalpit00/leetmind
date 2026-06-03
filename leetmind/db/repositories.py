@@ -349,6 +349,68 @@ class BridgesRepo:
         return [_bridge_from_db(r) for r in rows]
 
 
+class EmbeddingsRepo:
+    """Local semantic vectors for analyzed solution patterns."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def upsert(
+        self,
+        *,
+        problem_slug: str,
+        embedding_model: str,
+        embedding: list[float],
+        content_hash: str,
+    ) -> None:
+        self.conn.execute(
+            """
+            INSERT INTO solution_embeddings
+                (problem_slug, embedding_model, embedding_json, content_hash, embedded_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(problem_slug) DO UPDATE SET
+                embedding_model = excluded.embedding_model,
+                embedding_json  = excluded.embedding_json,
+                content_hash    = excluded.content_hash,
+                embedded_at     = excluded.embedded_at
+            """,
+            (problem_slug, embedding_model, json.dumps(embedding), content_hash, _now()),
+        )
+        self.conn.commit()
+
+    def existing_hash(self, problem_slug: str, embedding_model: str) -> str | None:
+        row = self.conn.execute(
+            """
+            SELECT content_hash FROM solution_embeddings
+            WHERE problem_slug = ? AND embedding_model = ?
+            """,
+            (problem_slug, embedding_model),
+        ).fetchone()
+        return row["content_hash"] if row else None
+
+    def all(self, embedding_model: str | None = None) -> list[dict[str, Any]]:
+        if embedding_model:
+            rows = self.conn.execute(
+                "SELECT * FROM solution_embeddings WHERE embedding_model = ?",
+                (embedding_model,),
+            ).fetchall()
+        else:
+            rows = self.conn.execute("SELECT * FROM solution_embeddings").fetchall()
+        return [
+            {
+                "problem_slug": r["problem_slug"],
+                "embedding_model": r["embedding_model"],
+                "embedding": json.loads(r["embedding_json"]),
+                "content_hash": r["content_hash"],
+                "embedded_at": r["embedded_at"],
+            }
+            for r in rows
+        ]
+
+    def count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) AS c FROM solution_embeddings").fetchone()["c"]
+
+
 def _analysis_from_db(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "problem_slug": row["problem_slug"],

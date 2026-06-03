@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from ..config import MODEL_API_KEY, MODEL_NAME
+from ..config import EMBEDDING_MODEL, MODEL_API_KEY, MODEL_NAME
 
 
 class KBConfigError(RuntimeError):
@@ -30,3 +30,7 @@ def get_openai_client():
 
 def get_model_name() -> str:
     return MODEL_NAME
+
+
+def get_embedding_model_name() -> str:
+    return EMBEDDING_MODEL

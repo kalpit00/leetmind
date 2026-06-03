@@ -21,6 +21,7 @@ memory:
 
 ```bash
 uv run leetmind analyze-solutions
+uv run leetmind embed-kb
 uv run leetmind kb-status
 ```
 
@@ -30,6 +31,7 @@ Example after a full local sync:
 Knowledge base:
   analyses       1910
   indexed        1910
+  embeddings     1910
   cached bridges 3
   languages      Java(1902), MySQL(4), TypeScript(2), JavaScript(1), Go(1)
   top techniques array, dynamic programming, greedy, string manipulation, sorting, two pointers, hash table, counting
@@ -104,12 +106,15 @@ Prints ranked matches with scoring reasons, e.g.:
 
 ```bash
 uv run leetmind patterns "monotonic stack"
+uv run leetmind semantic-patterns "matrix rows become histograms"
 uv run leetmind bridge "Maximal Rectangle"
 ```
 
-`patterns` searches distilled solution analyses. `bridge` connects a target
-problem to already-solved problems whose pattern/template transfers to it. For
-example, Maximal Rectangle bridges strongly to Largest Rectangle in Histogram:
+`patterns` searches distilled solution analyses by keyword. `semantic-patterns`
+searches the same KB by meaning using local embeddings. `bridge` connects a
+target problem to already-solved problems whose pattern/template transfers to it.
+For example, Maximal Rectangle bridges strongly to Largest Rectangle in
+Histogram:
 
 ```text
 relationship: build a histogram for each matrix row, then use the monotonic-stack

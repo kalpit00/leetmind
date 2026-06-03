@@ -30,6 +30,9 @@ Knowledge-base tools (distilled from analyzed submissions; require that
   complexity, pitfalls, reusable template, and style notes for one solved problem.
 - search_solution_patterns(query): search the distilled patterns/techniques/ideas
   (cleaner than search_my_solutions for "which problems use a monotonic stack").
+- semantic_search_solution_patterns(query): semantic search over the analyzed KB.
+  Use this when the user describes a concept indirectly or when keyword search
+  may miss related patterns with different wording.
 - get_coding_style_profile(): how the user tends to write code (languages,
   recurring style traits, favorite techniques). Use it to phrase suggestions in
   the user's own voice.

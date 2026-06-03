@@ -67,6 +67,7 @@ cp .env.example .env
 
 uv run leetmind sync --limit 50   # omit --limit for a full sync
 uv run leetmind analyze-solutions # build the pattern/style knowledge base
+uv run leetmind embed-kb           # add semantic retrieval over the KB
 uv run leetmind ask "Have I solved Two Sum?"
 uv run leetmind chat
 ```
@@ -93,11 +94,13 @@ leetmind ask "Have I solved Two Sum?"
 | ----------------------- | --------------------------------------------------------------------------------------------------------- |
 | `leetmind sync` | Pull problems, lists, and submissions into SQLite. Flags: `--limit N`, `--skip-submissions`, `--no-code`. |
 | `leetmind analyze-solutions` | Analyze accepted submissions into pattern/style knowledge (uses LLM). |
+| `leetmind embed-kb` | Embed analyzed patterns for semantic retrieval. |
 | `leetmind kb-status` | Show KB stats, languages, and top techniques. |
 | `leetmind ask "..."` | Ask one question. Tool trace on by default; use `--quiet` to hide. |
 | `leetmind chat` | Interactive multi-turn chat. |
 | `leetmind search "..."` | Run raw keyword search directly (no LLM). |
 | `leetmind patterns "..."` | Search distilled solution patterns (no LLM). |
+| `leetmind semantic-patterns "..."` | Search distilled patterns by meaning, not exact words. |
 | `leetmind bridge "..."` | Connect a problem to your solved patterns/templates (uses LLM). |
 
 ## Demo
@@ -147,6 +150,7 @@ stack template.
 
 ```bash
 uv run leetmind bridge "Maximal Rectangle"
+uv run leetmind semantic-patterns "matrix rows become histograms"
 uv run leetmind ask "Help me solve Maximal Rectangle using what I've already solved"
 uv run leetmind ask "What's my coding style?"
 ```
